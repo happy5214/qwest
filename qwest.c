@@ -25,6 +25,7 @@ int primes[] = {  2,   3,   5,   7,  11,  13,  17,  19,  23,  29,
 int plist[nprimes];
 int otable[nprimes];
 int o1list[nprimes];    // list of primes with ord(p,b) = 1
+int nmodp[maxn][nprimes];    // precomputed values of n%p
 int b = 2;
 int nplist = 0;
 int opmax = 0;
@@ -68,6 +69,7 @@ void init_plist(void)
 {
   int i;
   int p;
+  int o;
   int count = 0;
   int ocount = 0;
   int o1count = 0;
@@ -76,13 +78,17 @@ void init_plist(void)
     p = primes[i];
     if (p%b != 0)    
     {
-      plist[count] = p;
-      otable[count] = ord(p,b);
-      ocount += otable[count];
+      o = ord(p,b);
+      if (o > 1)
+      {
+        plist[count] = p;
+        otable[count] = o;
+        ocount += o;
+        count++;
 //      printf("p = %d otable[%d] = %d\n", p, count, otable[count]);
-      if (otable[count] == 1)
+      }
+      else
         o1list[o1count++] = p;
-      count++;
     }
   }
   nplist = count;
@@ -125,6 +131,17 @@ void init_rpntab(void)
   free(pntab);
 }
 
+void init_nmodp(void)
+{
+  int i, n, p;
+  for (i=0; i<nplist; i++)
+  {
+    p = plist[i];
+    for (n=0; n<maxn; n++)
+      nmodp[n][i] = n%p;
+  }
+}
+
 void open_files(void)
 {
   zerofile = fopen("zero.txt", "a");
@@ -149,7 +166,11 @@ void sieve(void)
   uint64_t k;
   int i, j, l, m, n, o, p;
   int count;
-  unsigned int ks;
+  int kmodp[nplist];    // precomputed k%p for all p in plist
+  int kbmodp[o1max];    // precomputed (k*b^1)%p for all p in o1list
+  int bksmodp[o1max];   // precomputed (b*kstep)%p for all p in o1list
+  int kmodb;            // precomputed k%b
+  int ks;
   bool skip = false;
   bool *remain;
   bool *full_remain;
@@ -163,19 +184,51 @@ void sieve(void)
   for (n=0; n<maxn; n++)
     full_remain[n] = true;
 
+  kmodb = (kmin-kstep)%b;
+  for (i=0; i<nplist; i++)
+  {
+    p = plist[i];
+    kmodp[i] = (kmin-kstep)%p;
+  }
+  for (i=0; i<o1max; i++)
+  {
+    p = o1list[i];
+    kbmodp[i] = (b*(kmin-kstep)%p)%p;
+    bksmodp[i] = (b*kstep)%p;
+  }
+  
   for (k=kmin; k<=kmax; k+=kstep)
   {
-    skip = false;
-    if ((k%b) == 0)
-      skip = true;
+    for (i=0; i<nplist; i++)
+    {
+      kmodp[i] += kstep;
+      while (kmodp[i] >= plist[i])
+        kmodp[i] -= plist[i];
+    }
 
     for (i=0; i<o1max; i++)
     {
-      p = o1list[i];
-      if (((k%p)*(b%p))%p == 1)
+      kbmodp[i] += bksmodp[i];
+      while (kbmodp[i] >= o1list[i])
+        kbmodp[i] -= o1list[i];
+    }
+
+    skip = false;
+    kmodb += kstep;
+    while (kmodb >= b)
+      kmodb -= b;
+    if (kmodb == 0)
+      skip = true;
+
+    if (!skip)
+    {
+      for (i=0; i<o1max; i++)
       {
-        skip = true;
-        break;
+        if (kbmodp[i] == 1)
+        {
+          skip = true;
+          break;
+        }
       }
     }
 
@@ -189,11 +242,11 @@ void sieve(void)
       {
         p = plist[i];
         o = otable[i];
-        ks = k%p;
+        ks = kmodp[i];
         if (ks > 0)
           for (n=1; n<o+1; n++)
           {
-            m = n%p;
+            m = nmodp[n][i];
             if (ks == rpntab[j+m])
             {
               for (l=n; l<=maxn; l+=o)
@@ -262,6 +315,7 @@ int main(int argc, char *argv[])
 //  printf ("k = %" PRIu64 "-%" PRIu64 "\n", kmin, kmax);
   init_plist();
   init_rpntab();
+  init_nmodp();
   open_files();
   sieve();
   close_files();
