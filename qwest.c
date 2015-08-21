@@ -8,9 +8,10 @@
 #include <unistd.h>
 #include <string.h>
 
-#define nprimes 97
+#define maxnprimes 250
 #define maxn  1000
 
+/*
 int primes[] = {  2,   3,   5,   7,  11,  13,  17,  19,  23,  29,
                  31,  37,  41,  43,  47,  53,  59,  61,  67,  71,
                  73,  79,  83,  89,  97, 101, 103, 107, 109, 113,
@@ -19,23 +20,46 @@ int primes[] = {  2,   3,   5,   7,  11,  13,  17,  19,  23,  29,
                 233, 239, 241, 251, 257, 263, 269, 271, 277, 281,
                 283, 293, 307, 311, 313, 317, 331, 337, 347, 349,
                 353, 359, 367, 373, 379, 383, 389, 397, 401, 409,
-                417, 421, 431, 433, 439, 443, 449, 457, 461, 463,
+                419, 421, 431, 433, 439, 443, 449, 457, 461, 463,
                 467, 479, 487, 491, 499, 503, 509 };
+*/
+int primes[maxnprimes];
 
-int plist[nprimes];
-int otable[nprimes];
-int o1list[nprimes];    // list of primes with ord(p,b) = 1
-int nmodp[maxn][nprimes];    // precomputed values of n%p
+int plist[maxnprimes];
+int otable[maxnprimes];
+int o1list[maxnprimes];    // list of primes with ord(p,b) = 1
+int nmodp[maxn][maxnprimes];    // precomputed values of n%p
 int b = 2;
 int nplist = 0;
 int opmax = 0;
 int o1max = 0;
+int nprimes;
+int maxp = 512;
 unsigned int *rpntab;
 uint64_t kmin, kmax, kstep;
 int low, high;
 FILE *zerofile;
 FILE *lowfile;
 FILE *highfile;
+
+int Erathosthenes(int pmax)
+{
+  int numbers[pmax];
+  int i, j;
+  for (i=0; i<pmax-1; i++)
+    numbers[i] = i+2;
+// sieve
+  for (i=0; i<pmax-1; i++)
+    if (numbers[i] > 0)
+      for (j=2*numbers[i]-2; j<pmax; j+=numbers[i])
+        numbers[j] = 0;
+// transfer the primes to their own array
+  j = 0;
+  for (i=0; i<pmax-1; i++)
+    if (numbers[i] > 0)
+      primes[j++] = numbers[i];
+  return j;
+}
 
 int powmod(int b, int n, int m)    /* powmod = b^n mod m */
 {
@@ -94,7 +118,8 @@ void init_plist(void)
   nplist = count;
   opmax = ocount;
   o1max = o1count;
-//  printf("o1max = %d\n", o1max);
+  printf("opmax = %d\n", opmax);
+  printf("o1max = %d\n", o1max);
 }
 
 void init_rpntab(void)
@@ -164,7 +189,7 @@ void close_files(void)
 void sieve(void)
 {
   uint64_t k;
-  int i, j, l, m, n, o, p;
+  int i, j, l, m, n, o, p, om;
   int count;
   int kmodp[nplist];    // precomputed k%p for all p in plist
   int kbmodp[o1max];    // precomputed (k*b^1)%p for all p in o1list
@@ -244,7 +269,11 @@ void sieve(void)
         o = otable[i];
         ks = kmodp[i];
         if (ks > 0)
-          for (n=1; n<o+1; n++)
+        {
+          om = maxn;
+          if (o < maxn)
+            om = o+1;
+          for (n=1; n<om; n++)
           {
             m = nmodp[n][i];
             if (ks == rpntab[j+m])
@@ -254,6 +283,7 @@ void sieve(void)
               break;
             }
           }
+        }
         j += o;
       }
       count = 0;
@@ -292,8 +322,9 @@ int main(int argc, char *argv[])
   kstep =       2;
   low   =     333;
   high  =     334;
+  maxp  =     512;
 
-  while ((option = getopt(argc, argv, "b:k:K:s:l:h:")) >= 0)
+  while ((option = getopt(argc, argv, "b:k:K:s:l:h:p:")) >= 0)
     switch (option)
     {
       case 'b' : b = atoi(optarg);
@@ -308,11 +339,24 @@ int main(int argc, char *argv[])
                  break;
       case 'h' : high = atoi(optarg);
                  break;
+      case 'p' : maxp = atoi(optarg);
+                 break;
       case '?' : return 1;
     }
 
 //  printf("b = %d\n", b);
 //  printf ("k = %" PRIu64 "-%" PRIu64 "\n", kmin, kmax);
+  nprimes = Erathosthenes(maxp);
+  printf("no. of primes = %d\n", nprimes);
+  printf("largest prime = %d\n", primes[nprimes-1]);
+
+/*
+  int i;
+  for (i=0; i<nprimes; i++)
+    printf("%4d", primes[i]);
+  printf("\n");
+*/
+   
   init_plist();
   init_rpntab();
   init_nmodp();
