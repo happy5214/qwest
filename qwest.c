@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#define maxnprimes 250
+#define maxnprimes 1000
 #define maxn  1000
 
 /*
@@ -35,6 +35,7 @@ int opmax = 0;
 int o1max = 0;
 int nprimes;
 int maxp = 512;
+int maxord = 512;
 unsigned int *rpntab;
 uint64_t kmin, kmax, kstep;
 int low, high;
@@ -103,7 +104,7 @@ void init_plist(void)
     if (p%b != 0)    
     {
       o = ord(p,b);
-      if (o > 1)
+      if ((o > 1) && (o <= maxord))
       {
         plist[count] = p;
         otable[count] = o;
@@ -111,7 +112,7 @@ void init_plist(void)
         count++;
 //      printf("p = %d otable[%d] = %d\n", p, count, otable[count]);
       }
-      else
+      if (o == 1)
         o1list[o1count++] = p;
     }
   }
@@ -316,15 +317,16 @@ int main(int argc, char *argv[])
   char *ptr;
 
 /* default values */
-  b     =       2;
-  kmin  =       1;
-  kmax  =      10;
-  kstep =       2;
-  low   =     333;
-  high  =     334;
-  maxp  =     512;
+  b      =       2;
+  kmin   =       1;
+  kmax   =      10;
+  kstep  =       2;
+  low    =     333;
+  high   =     334;
+  maxp   =     512;
+  maxord =     512;
 
-  while ((option = getopt(argc, argv, "b:k:K:s:l:h:p:")) >= 0)
+  while ((option = getopt(argc, argv, "b:k:K:s:l:h:p:o:")) >= 0)
     switch (option)
     {
       case 'b' : b = atoi(optarg);
@@ -340,6 +342,8 @@ int main(int argc, char *argv[])
       case 'h' : high = atoi(optarg);
                  break;
       case 'p' : maxp = atoi(optarg);
+                 break;
+      case 'o' : maxord = atoi(optarg);
                  break;
       case '?' : return 1;
     }
