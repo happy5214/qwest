@@ -21,7 +21,7 @@ int nprimes;
 int maxp = 512;
 int maxord = 512;
 int maxn = 1000;
-uint64_t kmin, kmax, kstep;
+int64_t kmin, kmax, kstep;
 int low, high;
 FILE *zerofile;
 FILE *lowfile;
@@ -165,13 +165,15 @@ void close_files(void)
 
 void sieve(void)
 {
-  uint64_t k;
+  int64_t k;
   int i, j, l, m, n, o, p, om, nm;
   int count;
   int kmodp[nplist];    // precomputed k%p for all p in plist
+  int kstepmodp[nplist];   // precomputed kstep%p for all p in plist
   int kbmodp[o1max];    // precomputed (k*b^1)%p for all p in o1list
   int bksmodp[o1max];   // precomputed (b*kstep)%p for all p in o1list
   int kmodb;            // precomputed k%b
+  int kstepmodb;        // precomputed kstep%b
   int ks;
   bool skip = false;
   bool *remain;
@@ -183,19 +185,23 @@ void sieve(void)
     printf("memory allocation error!\n");
     exit(1);
   }
+
   for (n=0; n<maxn; n++)
     full_remain[n] = true;
 
-  kmodb = (kmin-kstep)%b;
+  kmodb = ((kmin-kstep)%b+b)%b;
+  kstepmodb = kstep%b;
+
   for (i=0; i<nplist; i++)
   {
     p = plist[i];
-    kmodp[i] = (kmin-kstep)%p;
+    kmodp[i] = ((kmin-kstep)%p+p)%p;
+    kstepmodp[i] = kstep%p;
   }
   for (i=0; i<o1max; i++)
   {
     p = o1list[i];
-    kbmodp[i] = (b*(kmin-kstep)%p)%p;
+    kbmodp[i] = (b*((kmin-kstep)%p+p))%p;
     bksmodp[i] = (b*kstep)%p;
   }
   
@@ -203,21 +209,21 @@ void sieve(void)
   {
     for (i=0; i<nplist; i++)
     {
-      kmodp[i] += kstep;
-      while (kmodp[i] >= plist[i])
+      kmodp[i] += kstepmodp[i];
+      if (kmodp[i] >= plist[i])
         kmodp[i] -= plist[i];
     }
 
     for (i=0; i<o1max; i++)
     {
       kbmodp[i] += bksmodp[i];
-      while (kbmodp[i] >= o1list[i])
+      if (kbmodp[i] >= o1list[i])
         kbmodp[i] -= o1list[i];
     }
 
     skip = false;
-    kmodb += kstep;
-    while (kmodb >= b)
+    kmodb += kstepmodb;
+    if (kmodb >= b)
       kmodb -= b;
     if (kmodb == 0)
       skip = true;
@@ -257,13 +263,13 @@ void sieve(void)
         if (remain[n] == true)
           count++;
       if (count == 0)
-        fprintf (zerofile, "%20" PRIu64 " %4d\n", k, count);
+        fprintf (zerofile, "%20" PRId64 " %4d\n", k, count);
       else
       {
         if (count <= low)
-          fprintf (lowfile,  "%20" PRIu64 " %4d\n", k, count);
+          fprintf (lowfile,  "%20" PRId64 " %4d\n", k, count);
         if (count >= high)
-          fprintf (highfile, "%20" PRIu64 " %4d\n", k, count);
+          fprintf (highfile, "%20" PRId64 " %4d\n", k, count);
       }
 /*
       for (n=0; n<maxn; n++)
@@ -297,11 +303,11 @@ int main(int argc, char *argv[])
     {
       case 'b' : b = atoi(optarg);
                  break;
-      case 'k' : kmin = strtoull(optarg, &ptr, 10);
+      case 'k' : kmin = strtoll(optarg, &ptr, 10);
                  break;
-      case 'K' : kmax = strtoull(optarg, &ptr, 10);
+      case 'K' : kmax = strtoll(optarg, &ptr, 10);
                  break;
-      case 's' : kstep = strtoull(optarg, &ptr, 10);
+      case 's' : kstep = strtoll(optarg, &ptr, 10);
                  break;
       case 'l' : low = atoi(optarg);
                  break;
