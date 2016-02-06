@@ -9,7 +9,7 @@
 #include <string.h>
 #include <signal.h>
 
-#define TIME_INTERVAL 10
+#define REPORT_INTERVAL 5000000
 
 int *primes;
 int *plist;
@@ -28,7 +28,6 @@ int slice = 0;
 int modulus = 1;
 bool quiet = false;
 bool stop = false;
-bool update_status = false;
 bool slicing = false;
 bool riesel = false;
 bool ignore_zeros = false;
@@ -42,12 +41,6 @@ void terminate(int signum)
 {
   signal (signum, SIG_IGN);
   stop = true;
-}
-
-void status_update(int signum)
-{
-  // signal (signum, SIG_IGN);
-  update_status = true;
 }
 
 int Erathosthenes(int pmax)
@@ -228,6 +221,7 @@ void sieve(void)
   uint64_t k;
   double to_percent;    // for percentage calculation
   int i, j, l, m, n, o, p, om, nm;
+  int countdown;        // for progress indicator
   int count;
   int kmodp[nplist];    // precomputed k%p for all p in plist
   int kstepmodp[nplist];   // precomputed kstep%p for all p in plist
@@ -301,6 +295,8 @@ void sieve(void)
   if (kmax + kstep < kmax)    // to prevent overflow at 2^64-1
     kmax -= kstep;
 //  printf("kmax (adjusted) = %20" PRIu64 "\n", kmax);
+
+  countdown = REPORT_INTERVAL;
 
   for (k=kmin; k<=kmax; k+=kstep)
   {
@@ -396,11 +392,11 @@ void sieve(void)
       write_checkpoint(k+kstep);
       break;
     }
-    if (update_status)
+    countdown--;
+    if ((countdown == 0) && !quiet)
     {
-      printf("Tested up to k = %" PRIu64 " (%.2f%% done)\n", k, k*to_percent);
-      update_status = false;
-      alarm(TIME_INTERVAL);
+      printf("Tested up to k = %" PRIu64 " (%.2f%% done)\n", k, (k-kmin)*to_percent);
+      countdown = REPORT_INTERVAL;
     }
   }
   free(remain);
@@ -468,9 +464,6 @@ int main(int argc, char *argv[])
   read_checkpoint();
   signal(SIGINT, terminate);
   signal(SIGTERM, terminate);
-  signal(SIGALRM, status_update);
-  if (!quiet)  // progress reporting only when not in quiet mode
-    alarm(TIME_INTERVAL);
 //  printf("b = %d\n", b);
 //  printf ("k = %" PRIu64 "-%" PRIu64 "\n", kmin, kmax);
   nprimes = Erathosthenes(maxp);
