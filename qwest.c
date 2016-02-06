@@ -7,6 +7,9 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
+
+#define TIME_INTERVAL 10
 
 int *primes;
 int *plist;
@@ -21,11 +24,31 @@ int nprimes;
 int maxp = 512;
 int maxord = 512;
 int maxn = 1000;
-int64_t kmin, kmax, kstep;
+int slice = 0;
+int modulus = 1;
+bool quiet = false;
+bool stop = false;
+bool update_status = false;
+bool slicing = false;
+bool riesel = false;
+bool ignore_zeros = false;
+uint64_t kmin, kmax, kstep;
 int low, high;
 FILE *zerofile;
 FILE *lowfile;
 FILE *highfile;
+
+void terminate(int signum)
+{
+  signal (signum, SIG_IGN);
+  stop = true;
+}
+
+void status_update(int signum)
+{
+  // signal (signum, SIG_IGN);
+  update_status = true;
+}
 
 int Erathosthenes(int pmax)
 {
@@ -80,7 +103,7 @@ int ord(int a, int b)
   return k;
 }
 
-void init_plist(void)
+void init_plist(bool skip_kstep_factors)
 {
   int i;
   int p;
@@ -94,7 +117,7 @@ void init_plist(void)
   for (i=0; i<nprimes; i++)
   {
     p = primes[i];
-    if (p%b != 0)    
+    if ((p%b != 0) && (b%p != 0) && ((skip_kstep_factors && (kstep%p != 0)) || !skip_kstep_factors))
     {
       o = ord(p,b);
       if ((o > 1) && (o <= maxord))
@@ -102,8 +125,8 @@ void init_plist(void)
         plist[count] = p;
         otable[count] = o;
         ocount += o;
+//        printf("p = %d otable[%d] = %d\n", p, count, otable[count]);
         count++;
-//      printf("p = %d otable[%d] = %d\n", p, count, otable[count]);
       }
       if (o == 1)
         o1list[o1count++] = p;
@@ -112,8 +135,11 @@ void init_plist(void)
   nplist = count;
   opmax = ocount;
   o1max = o1count;
-  printf("opmax = %d\n", opmax);
-  printf("o1max = %d\n", o1max);
+  if (!quiet)
+  {
+    printf("opmax = %d\n", opmax);
+    printf("o1max = %d\n", o1max);
+  }
 }
 
 void init_nmap(void)
@@ -146,26 +172,61 @@ void init_nmap(void)
 
 void open_files(void)
 {
-  zerofile = fopen("zero.txt", "a");
+  if (!ignore_zeros)
+    zerofile = fopen("zero.txt", "a");
   lowfile  = fopen("low.txt",  "a");
   highfile = fopen("high.txt", "a");
-  if ((!zerofile) || (!lowfile) || (!highfile))
+  if ((!ignore_zeros && !zerofile) || (!lowfile) || (!highfile))
   {
     printf("error creating/opening files!\n");
     exit(1);
   }
 }
 
+void read_checkpoint()
+{
+  FILE *file;
+  uint64_t k;
+  if ((file = fopen("checkpoint.txt", "r")) == NULL)
+    return;
+
+  if (fscanf(file,"%" PRIu64, &k) == 1)
+  {
+    if (kmin < k)
+    {
+      kmin = k;
+      printf("Resuming from checkpoint k = %" PRIu64 "\n", k);
+    }
+  }
+  fclose(file);
+  remove("checkpoint.txt");
+}
+
+void write_checkpoint(uint64_t k)
+{
+  FILE *file;
+  file = fopen("checkpoint.txt", "w");
+  if (!file)
+  {
+    printf("error creating checkpoint file!\n");
+    exit(1);
+  }
+  fprintf (file,  "%" PRIu64 "\n", k);
+  fclose(file);
+}
+
 void close_files(void)
 {
-  fclose(zerofile);
+  if (!ignore_zeros)
+    fclose(zerofile);
   fclose(lowfile);
   fclose(highfile);
 }
 
 void sieve(void)
 {
-  int64_t k;
+  uint64_t k;
+  double to_percent;    // for percentage calculation
   int i, j, l, m, n, o, p, om, nm;
   int count;
   int kmodp[nplist];    // precomputed k%p for all p in plist
@@ -175,6 +236,7 @@ void sieve(void)
   int kmodb;            // precomputed k%b
   int kstepmodb;        // precomputed kstep%b
   int ks;
+  int pos;
   bool skip = false;
   bool *remain;
   bool *full_remain;
@@ -189,22 +251,57 @@ void sieve(void)
   for (n=0; n<maxn; n++)
     full_remain[n] = true;
 
-  kmodb = ((kmin-kstep)%b+b)%b;
+//  kmodb = ((kmin-kstep)%b+b)%b;
+  kmodb = (b + kmin%b - kstep%b)%b;
   kstepmodb = kstep%b;
+  if (!riesel)
+  {
+    kmodb = b - kmodb;
+    kstepmodb = b - kstepmodb;
+  }
 
   for (i=0; i<nplist; i++)
   {
     p = plist[i];
-    kmodp[i] = ((kmin-kstep)%p+p)%p;
-    kstepmodp[i] = kstep%p;
+//    kmodp[i] = (p+(kmin-kstep)%p)%p;
+//    kmodp[i] = (p + kmin%p - kstep%p)%p;
+    if (riesel)
+      kmodp[i] = (p + kmin%p - kstep%p)%p;
+    else
+      kmodp[i] = p - (p + kmin%p - kstep%p)%p;
+//    printf("p = %d, kmodp = %d\n", p, kmodp[i]);
+//    kstepmodp[i] = kstep%p;
+    if (riesel)
+      kstepmodp[i] = kstep%p;
+    else
+      kstepmodp[i] = p - kstep%p;
   }
   for (i=0; i<o1max; i++)
   {
     p = o1list[i];
-    kbmodp[i] = (b*((kmin-kstep)%p+p))%p;
-    bksmodp[i] = (b*kstep)%p;
+//    kbmodp[i] = (b*((kmin-kstep)%p+p))%p;
+//    kbmodp[i] = (b*(p + kmin%p - kstep%p))%p;
+//    bksmodp[i] = (b*kstep)%p;
+    if (riesel)
+    {
+      kbmodp[i] = (b*(p + kmin%p - kstep%p))%p;
+      bksmodp[i] = (b*kstep)%p;
+    }
+    else
+    {
+      kbmodp[i] = p - (b*(p + kmin%p - kstep%p))%p;
+      bksmodp[i] = p - (b*kstep)%p;
+    }
+//    printf("p = %d, kbmodp = %d, bksmodp = %d\n", p, kbmodp[i], bksmodp[i]);
   }
   
+  to_percent = 100.0/(double)(kmax - kmin);
+// adjust kmax accordingly so that: kmax = kmin + x*kstep
+  kmax -= (kmax-kmin)%kstep;
+  if (kmax + kstep < kmax)    // to prevent overflow at 2^64-1
+    kmax -= kstep;
+//  printf("kmax (adjusted) = %20" PRIu64 "\n", kmax);
+
   for (k=kmin; k<=kmax; k+=kstep)
   {
     for (i=0; i<nplist; i++)
@@ -232,7 +329,8 @@ void sieve(void)
     {
       for (i=0; i<o1max; i++)
       {
-        if (kbmodp[i] == 1)
+        if (kbmodp[i] == 1)     // Riesel
+//        if (kbmodp[i] == plist[i]-1)  // original Sierpinski (no inverting)
         {
           skip = true;
           break;
@@ -245,6 +343,7 @@ void sieve(void)
 //      for (n=0; n<maxn; n++)
 //        remain[n] = true;
       memcpy(remain, full_remain, maxn*sizeof(bool));
+      pos = 0;
       for (i=0; i<nplist; i++)
       {
         p = plist[i];
@@ -252,30 +351,56 @@ void sieve(void)
         ks = kmodp[i];
         if (ks > 0)
         {
-          n = nmap[i*maxp+ks];
+          n = nmap[pos+ks];
+//          n = nmap[i*maxp+ks];
           if (n > 0)
             for (l=n; l<=maxn; l+=o)
               remain[l-1] = false;
         }
+        pos += maxp;
       }
       count = 0;
-      for (n=0; n<maxn; n++)
-        if (remain[n] == true)
-          count++;
+      if (slicing)
+      {
+        for (n=slice; n<maxn; n+=modulus)
+          if (remain[n] == true)
+            count++;
+      }
+      else
+      {
+        for (n=0; n<maxn; n++)
+          if (remain[n] == true)
+            count++;
+      }
       if (count == 0)
-        fprintf (zerofile, "%20" PRId64 " %4d\n", k, count);
+      { 
+        if (!ignore_zeros)
+          fprintf (zerofile, "%20" PRIu64 " %4d\n", k, count);
+      }
       else
       {
         if (count <= low)
-          fprintf (lowfile,  "%20" PRId64 " %4d\n", k, count);
+          fprintf (lowfile,  "%20" PRIu64 " %4d\n", k, count);
         if (count >= high)
-          fprintf (highfile, "%20" PRId64 " %4d\n", k, count);
+          fprintf (highfile, "%20" PRIu64 " %4d\n", k, count);
       }
 /*
       for (n=0; n<maxn; n++)
         if (remain[n] == true)
           printf("%d\n", n+1);
 */
+    }
+    if (stop)
+    {
+      printf("Terminating at k = %" PRIu64 "\n", k);
+      write_checkpoint(k+kstep);
+      break;
+    }
+    if (update_status)
+    {
+      printf("Tested up to k = %" PRIu64 " (%.2f%% done)\n", k, k*to_percent);
+      update_status = false;
+      alarm(TIME_INTERVAL);
     }
   }
   free(remain);
@@ -297,17 +422,23 @@ int main(int argc, char *argv[])
   maxp   =     512;
   maxord =     512;
   maxn   =    1000;
+  quiet  =   false;
+  stop   =   false;
+  slicing =  false;
+  riesel =   false;
+  slice  =       0;
+  modulus =      1;
 
-  while ((option = getopt(argc, argv, "b:k:K:s:l:h:p:o:n:")) >= 0)
+  while ((option = getopt(argc, argv, "b:k:K:s:l:h:p:o:n:e:m:qzr")) >= 0)
     switch (option)
     {
       case 'b' : b = atoi(optarg);
                  break;
-      case 'k' : kmin = strtoll(optarg, &ptr, 10);
+      case 'k' : kmin = strtoull(optarg, &ptr, 10);
                  break;
-      case 'K' : kmax = strtoll(optarg, &ptr, 10);
+      case 'K' : kmax = strtoull(optarg, &ptr, 10);
                  break;
-      case 's' : kstep = strtoll(optarg, &ptr, 10);
+      case 's' : kstep = strtoull(optarg, &ptr, 10);
                  break;
       case 'l' : low = atoi(optarg);
                  break;
@@ -319,15 +450,36 @@ int main(int argc, char *argv[])
                  break;
       case 'n' : maxn = atoi(optarg);
                  break;
+      case 'e' : slice = atoi(optarg)-1;
+                 slicing = true;
+                 break;
+      case 'm' : modulus = atoi(optarg);
+                 slicing = true;
+                 break;
+      case 'q' : quiet = true;
+                 break;
+      case 'z' : ignore_zeros = true;
+                 break;
+      case 'r' : riesel = true;
+                 break;
       case '?' : return 1;
     }
 
+  read_checkpoint();
+  signal(SIGINT, terminate);
+  signal(SIGTERM, terminate);
+  signal(SIGALRM, status_update);
+  if (!quiet)  // progress reporting only when not in quiet mode
+    alarm(TIME_INTERVAL);
 //  printf("b = %d\n", b);
 //  printf ("k = %" PRIu64 "-%" PRIu64 "\n", kmin, kmax);
   nprimes = Erathosthenes(maxp);
-  printf("no. of primes = %d\n", nprimes);
-  printf("largest prime = %d\n", primes[nprimes-1]);
   maxp = primes[nprimes-1];
+  if (!quiet)
+  {
+    printf("no. of primes = %d\n", nprimes);
+    printf("largest prime = %d\n", maxp);
+  }
 
 /*
   int i;
@@ -336,7 +488,7 @@ int main(int argc, char *argv[])
   printf("\n");
 */
    
-  init_plist();
+  init_plist(slicing);
   init_nmap();
 
 /*
