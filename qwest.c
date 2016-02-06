@@ -11,6 +11,14 @@
 
 #define REPORT_INTERVAL 5000000
 
+typedef unsigned __int128 uint128_t;
+
+#define P10_UINT64 10000000000000000000ULL
+// #define E10_UINT64 19
+
+// #define STRINGIZER(x)	# x
+// #define TO_STRING(x)	STRINGIZER(x)
+
 int *primes;
 int *plist;
 int *otable;
@@ -31,16 +39,63 @@ bool stop = false;
 bool slicing = false;
 bool riesel = false;
 bool ignore_zeros = false;
-uint64_t kmin, kmax, kstep;
+uint128_t kmin, kmax, kstep;
 int low, high;
 FILE *zerofile;
 FILE *lowfile;
 FILE *highfile;
 
+char buffer[50];
+
 void terminate(int signum)
 {
   signal (signum, SIG_IGN);
   stop = true;
+}
+
+uint128_t strtou128(const char *s)
+{
+  int n = 0;
+  int base = 10;
+  unsigned char c;
+  uint128_t number = 0;
+  for(n=0; n<strlen(s); n++)
+  {
+    c = s[n];
+    c -= '0'; 
+    number *= (uint128_t) base;
+    number += (uint128_t) c; 
+//    sprint_u128(buffer, number); 
+//    printf("%d %s\n", c, buffer);
+  }
+  return number;
+}
+
+int sprint_u128(char *buffer, uint128_t u128)
+{
+  int n = 0;
+  if (u128 > UINT64_MAX)
+  {
+    uint128_t leading = u128 / P10_UINT64;
+    uint64_t trailing = u128 % P10_UINT64;
+    if (leading > UINT64_MAX)
+    {
+      uint64_t u64l = leading / P10_UINT64;
+      uint64_t u64t = leading % P10_UINT64;
+      n = sprintf(buffer, "%" PRIu64 "%.19" PRIu64 "%.19" PRIu64, u64l, u64t, trailing);
+    }
+    else
+    {
+      uint64_t u64 = leading;
+      n = sprintf(buffer, "%" PRIu64 "%.19" PRIu64, u64, trailing);
+    }
+  }
+  else
+  {
+    uint64_t u64 = u128;
+    n = sprintf(buffer, "%" PRIu64, u64);
+  }
+  return n;
 }
 
 int Erathosthenes(int pmax)
@@ -179,23 +234,25 @@ void open_files(void)
 void read_checkpoint()
 {
   FILE *file;
-  uint64_t k;
+  uint128_t k;
   if ((file = fopen("checkpoint.txt", "r")) == NULL)
     return;
 
-  if (fscanf(file,"%" PRIu64, &k) == 1)
+  if (fscanf(file,"%s", buffer) == 1)
   {
+    k = strtou128(buffer);
     if (kmin < k)
     {
       kmin = k;
-      printf("Resuming from checkpoint k = %" PRIu64 "\n", k);
+      sprint_u128(buffer, k);
+      printf("Resuming from checkpoint k = %s\n", buffer);
     }
   }
   fclose(file);
   remove("checkpoint.txt");
 }
 
-void write_checkpoint(uint64_t k)
+void write_checkpoint(uint128_t k)
 {
   FILE *file;
   file = fopen("checkpoint.txt", "w");
@@ -204,7 +261,8 @@ void write_checkpoint(uint64_t k)
     printf("error creating checkpoint file!\n");
     exit(1);
   }
-  fprintf (file,  "%" PRIu64 "\n", k);
+  sprint_u128(buffer, k);
+  fprintf(file, "%s\n", buffer);
   fclose(file);
 }
 
@@ -218,7 +276,9 @@ void close_files(void)
 
 void sieve(void)
 {
-  uint64_t k;
+//  uint64_t k;
+  uint128_t k;
+
   double to_percent;    // for percentage calculation
   int i, j, l, m, n, o, p, om, nm;
   int countdown;        // for progress indicator
@@ -292,9 +352,12 @@ void sieve(void)
   to_percent = 100.0/(double)(kmax - kmin);
 // adjust kmax accordingly so that: kmax = kmin + x*kstep
   kmax -= (kmax-kmin)%kstep;
-  if (kmax + kstep < kmax)    // to prevent overflow at 2^64-1
+  if (kmax + kstep < kmax)    // to prevent overflow at 2^128-1
+  {
     kmax -= kstep;
-//  printf("kmax (adjusted) = %20" PRIu64 "\n", kmax);
+    sprint_u128(buffer, kmax);
+    printf ("kmax (adjusted) = %s\n", buffer);
+  }
 
   countdown = REPORT_INTERVAL;
 
@@ -368,18 +431,29 @@ void sieve(void)
           if (remain[n] == true)
             count++;
       }
+
       if (count == 0)
       { 
         if (!ignore_zeros)
-          fprintf (zerofile, "%20" PRIu64 " %4d\n", k, count);
+        {
+          n = sprint_u128(buffer, k);
+          fprintf (zerofile, "%40s %4d\n", buffer, count);
+        }
       }
       else
       {
         if (count <= low)
-          fprintf (lowfile,  "%20" PRIu64 " %4d\n", k, count);
+        {
+          n = sprint_u128(buffer, k);
+          fprintf (lowfile,  "%40s %4d\n", buffer, count);
+        }
         if (count >= high)
-          fprintf (highfile, "%20" PRIu64 " %4d\n", k, count);
+        {
+          n = sprint_u128(buffer, k);
+          fprintf (highfile, "%40s %4d\n", buffer, count);
+        }
       }
+
 /*
       for (n=0; n<maxn; n++)
         if (remain[n] == true)
@@ -388,14 +462,16 @@ void sieve(void)
     }
     if (stop)
     {
-      printf("Terminating at k = %" PRIu64 "\n", k);
+      n = sprint_u128(buffer, k);
+      printf("Terminating at k = %s\n", buffer);
       write_checkpoint(k+kstep);
       break;
     }
     countdown--;
     if ((countdown == 0) && !quiet)
     {
-      printf("Tested up to k = %" PRIu64 " (%.2f%% done)\n", k, (k-kmin)*to_percent);
+      n = sprint_u128(buffer, k);
+      printf("Tested up to k = %s (%.2f%% done)\n", buffer, (k-kmin)*to_percent);
       countdown = REPORT_INTERVAL;
     }
   }
@@ -430,11 +506,14 @@ int main(int argc, char *argv[])
     {
       case 'b' : b = atoi(optarg);
                  break;
-      case 'k' : kmin = strtoull(optarg, &ptr, 10);
+      case 'k' : kmin = strtou128(optarg);
+// kmin = strtoull(optarg, &ptr, 10);
                  break;
-      case 'K' : kmax = strtoull(optarg, &ptr, 10);
+      case 'K' : kmax = strtou128(optarg);
+// kmax = strtoull(optarg, &ptr, 10);
                  break;
-      case 's' : kstep = strtoull(optarg, &ptr, 10);
+      case 's' : kstep = strtou128(optarg);
+// kstep = strtoull(optarg, &ptr, 10);
                  break;
       case 'l' : low = atoi(optarg);
                  break;
@@ -465,7 +544,10 @@ int main(int argc, char *argv[])
   signal(SIGINT, terminate);
   signal(SIGTERM, terminate);
 //  printf("b = %d\n", b);
-//  printf ("k = %" PRIu64 "-%" PRIu64 "\n", kmin, kmax);
+//  sprint_u128(buffer, kmin);
+//  printf ("k = %s", buffer);
+//  sprint_u128(buffer, kmax);
+//  printf ("-%s", buffer);
   nprimes = Erathosthenes(maxp);
   maxp = primes[nprimes-1];
   if (!quiet)
