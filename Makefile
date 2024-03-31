@@ -1,12 +1,14 @@
 CC = gcc
 FLAGS = -O2
 
+objs = qwest.o int128.o
+
 .PHONY: all
 
 all: qwest
 
-qwest: qwest.o
-	$(CC) -o $@ $<
+qwest: $(objs)
+	$(CC) -o $@ $(objs)
 
 %.o: %.c
 	$(CC) -c -o $@ $< $(FLAGS)
