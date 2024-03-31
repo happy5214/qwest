@@ -7,13 +7,13 @@
 #define P10_UINT64 10000000000000000000ULL
 
 uint128_t strtou128(const char *string) {
-  const int base = 10;
+  const uint128_t base = 10;
   uint128_t number = 0;
 
   for(; *string; ++string) {
     unsigned char digit = *string;
     digit -= '0';
-    number *= (uint128_t) base;
+    number *= base;
     number += (uint128_t) digit;
 //    sprint_u128(buffer, number); 
 //    printf("%d %s\n", c, buffer);
