@@ -230,7 +230,7 @@ void sieve(void)
   uint128_t k;
 
   double to_percent;    // for percentage calculation
-  int i, j, l, m, n, o, p, om, nm;
+  int i, l, n, o, p;
   int countdown;        // for progress indicator
   int count;
   int kmodp[nplist];    // precomputed k%p for all p in plist
@@ -432,7 +432,7 @@ void sieve(void)
 int main(int argc, char *argv[])
 {
   int option;
-  char *ptr;
+//  char *ptr;
 
 /* default values */
   b      =       2;

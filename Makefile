@@ -1,5 +1,5 @@
 CC = gcc
-FLAGS = -O2
+FLAGS = -O2 -Wall
 
 objs = qwest.o int128.o
 

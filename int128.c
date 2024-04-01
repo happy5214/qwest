@@ -24,7 +24,7 @@ uint128_t strtou128(const char *string)
   return number;
 }
 
-int snprint_u128(char *buffer, size_t size, const uint128_t u128)
+int snprint_u128(char * const buffer, const size_t size, const uint128_t u128)
 {
   int charactersWritten = 0;
 
