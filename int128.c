@@ -1,3 +1,5 @@
+#include <ctype.h>
+#include <errno.h>
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -6,19 +8,51 @@
 
 #define P10_UINT64 10000000000000000000ULL
 
-uint128_t strtou128(const char *string)
+uint128_t strtou128(const char * const string, const char **end, int base)
 {
-  const uint128_t base = 10;
   uint128_t number = 0;
+  const char *stringPointer = string;
 
-  for(; *string; ++string)
+  if (!base) {
+    base = 10;
+  }
+
+#ifdef DEBUG
+  char buffer[50];
+  int c = 0;
+#endif
+
+  for(; *stringPointer; ++stringPointer)
   {
-    unsigned char digit = *string;
+    unsigned char digit = *stringPointer;
+    if (isspace(digit))
+      continue;
+
     digit -= '0';
-    number *= base;
-    number += (uint128_t) digit;
-//    sprint_u128(buffer, number); 
-//    printf("%d %s\n", c, buffer);
+
+    if (digit >= 0 && digit <= 9)
+    {
+      const uint128_t nextNumber = number * (uint128_t) base + (uint128_t) digit;
+      if (nextNumber < number)
+      {
+        number = UINT128_MAX;
+        errno = ERANGE;
+        break;
+      }
+      number = nextNumber;
+    }
+    else
+    {
+      if (end)
+        *end = stringPointer;
+      break;
+    }
+
+#ifdef DEBUG
+    snprint_u128(buffer, 50, number);
+    printf("%d %s\n", c, buffer);
+    c++;
+#endif
   }
 
   return number;

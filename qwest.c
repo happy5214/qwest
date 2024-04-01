@@ -190,7 +190,7 @@ void read_checkpoint()
 
   if (fscanf(file,"%s", buffer) == 1)
   {
-    k = strtou128(buffer);
+    k = strtou128(buffer, NULL, 10);
     if (kmin < k)
     {
       kmin = k;
@@ -456,13 +456,13 @@ int main(int argc, char *argv[])
     {
       case 'b' : b = atoi(optarg);
                  break;
-      case 'k' : kmin = strtou128(optarg);
+      case 'k' : kmin = strtou128(optarg, NULL, 10);
 // kmin = strtoull(optarg, &ptr, 10);
                  break;
-      case 'K' : kmax = strtou128(optarg);
+      case 'K' : kmax = strtou128(optarg, NULL, 10);
 // kmax = strtoull(optarg, &ptr, 10);
                  break;
-      case 's' : kstep = strtou128(optarg);
+      case 's' : kstep = strtou128(optarg, NULL, 10);
 // kstep = strtoull(optarg, &ptr, 10);
                  break;
       case 'l' : low = atoi(optarg);
