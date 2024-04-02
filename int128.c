@@ -8,25 +8,28 @@
 
 #define P10_UINT64 10000000000000000000ULL
 
-uint128_t strtou128(const char * const string, const char **end, int base)
+uint128_t strtou128(const char * const string, const char **end, const int base)
 {
+#ifdef DEBUG
+  char buffer[50];
+  int charIndex = 0;
+#endif
+
   uint128_t number = 0;
   const char *stringPointer = string;
 
-  if (!base) {
-    base = 10;
+  if (base != 10)
+  {
+    errno = EINVAL;
+    return 0;
   }
 
-#ifdef DEBUG
-  char buffer[50];
-  int c = 0;
-#endif
+  while (isspace(*stringPointer))
+    stringPointer++;
 
   for(; *stringPointer; ++stringPointer)
   {
     unsigned char digit = *stringPointer;
-    if (isspace(digit))
-      continue;
 
     digit -= '0';
 
@@ -50,8 +53,8 @@ uint128_t strtou128(const char * const string, const char **end, int base)
 
 #ifdef DEBUG
     snprint_u128(buffer, 50, number);
-    printf("%d %s\n", c, buffer);
-    c++;
+    printf("%d %s\n", charIndex, buffer);
+    charIndex++;
 #endif
   }
 
