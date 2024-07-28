@@ -3,7 +3,7 @@ FLAGS = -O2 -Wall
 
 objs = qwest.o int128.o
 
-.PHONY: all
+.PHONY: all clean
 
 all: qwest
 
