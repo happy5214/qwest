@@ -23,7 +23,7 @@ int b = 2;
 int nplist = 0;
 int opmax = 0;
 int o1max = 0;
-int nprimes;
+size_t nprimes;
 int maxp = 512;
 int maxord = 512;
 int maxn = 1000;
@@ -502,7 +502,7 @@ int main(int argc, char *argv[])
   maxp = primes[nprimes-1];
   if (!quiet)
   {
-    printf("no. of primes = %d\n", nprimes);
+    printf("no. of primes = %zu\n", nprimes);
     printf("largest prime = %d\n", maxp);
   }
 
