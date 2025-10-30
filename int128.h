@@ -1,8 +1,6 @@
 #ifndef INT128_H
 #define INT128_H 1
 
-#include <stdio.h>
-
 typedef unsigned __int128 uint128_t;
 
 #define UINT128_MAX ((uint128_t) 0) - 1

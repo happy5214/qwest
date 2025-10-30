@@ -8,6 +8,7 @@
 #include <string.h>
 #include <signal.h>
 
+#include "carg_parser.h"
 #include "int128.h"
 
 #define REPORT_INTERVAL 5000000
@@ -429,9 +430,8 @@ void sieve(void)
   free(full_remain);
 }
 
-int main(int argc, char *argv[])
+int main(const int argc, const char * const argv[])
 {
-  int option;
 //  char *ptr;
 
 /* default values */
@@ -451,34 +451,63 @@ int main(int argc, char *argv[])
   slice  =       0;
   modulus =      1;
 
-  while ((option = getopt(argc, argv, "b:k:K:s:l:h:p:o:n:e:m:qzr")) >= 0)
-    switch (option)
-    {
-      case 'b' : b = atoi(optarg);
+  const ap_Option options[] = {
+    /* code, long_name, has_arg (no/yes/maybe/yme) */
+    { 'r', "riesel",    ap_no  },
+    { 'b', "base",      ap_yes },
+    { 'k', "k-min",     ap_yes },
+    { 'K', "k-max",     ap_yes },
+    { 's', "k-step",    ap_yes },
+    { 'n', "n-max",     ap_yes },
+    { 'p', "p-max",     ap_yes },
+    { 'o', "o-max",     ap_yes },
+    { 'w', "w-low",     ap_yes },
+    { 'W', "w-high",    ap_yes },
+    { 'q', "quiet",     ap_no  },
+    { 'z', "skip-zero", ap_no  },
+    { 0, 0,             ap_no  }
+  };
+
+  Arg_parser parser;
+  int argind = 0;
+
+  if (!ap_init(&parser, argc, argv, options, 0)) {
+    return 1;
+  }
+  if (ap_error(&parser)) {
+    return 1;
+  }
+
+  for (; argind < ap_arguments(&parser); ++argind) {
+    const int code = ap_code(&parser, argind);
+    const char * const arg = ap_argument(&parser, argind);
+    if (!code) break;				/* no more options */
+    switch (code) {
+      case 'b' : b = atoi(arg);
                  break;
-      case 'k' : kmin = strtou128(optarg, NULL, 10);
-// kmin = strtoull(optarg, &ptr, 10);
+      case 'k' : kmin = strtou128(arg, NULL, 10);
+// kmin = strtoull(arg, &ptr, 10);
                  break;
-      case 'K' : kmax = strtou128(optarg, NULL, 10);
-// kmax = strtoull(optarg, &ptr, 10);
+      case 'K' : kmax = strtou128(arg, NULL, 10);
+// kmax = strtoull(arg, &ptr, 10);
                  break;
-      case 's' : kstep = strtou128(optarg, NULL, 10);
-// kstep = strtoull(optarg, &ptr, 10);
+      case 's' : kstep = strtou128(arg, NULL, 10);
+// kstep = strtoull(arg, &ptr, 10);
                  break;
-      case 'l' : low = atoi(optarg);
+      case 'w' : low = atoi(arg);
                  break;
-      case 'h' : high = atoi(optarg);
+      case 'W' : high = atoi(arg);
                  break;
-      case 'p' : maxp = atoi(optarg);
+      case 'p' : maxp = atoi(arg);
                  break;
-      case 'o' : maxord = atoi(optarg);
+      case 'o' : maxord = atoi(arg);
                  break;
-      case 'n' : maxn = atoi(optarg);
+      case 'n' : maxn = atoi(arg);
                  break;
-      case 'e' : slice = atoi(optarg)-1;
+      case 'e' : slice = atoi(arg)-1;
                  slicing = true;
                  break;
-      case 'm' : modulus = atoi(optarg);
+      case 'm' : modulus = atoi(arg);
                  slicing = true;
                  break;
       case 'q' : quiet = true;
@@ -487,8 +516,10 @@ int main(int argc, char *argv[])
                  break;
       case 'r' : riesel = true;
                  break;
-      case '?' : return 1;
+      default  : return 1;
     }
+  }
+  ap_free(&parser);
 
   read_checkpoint();
   signal(SIGINT, terminate);
