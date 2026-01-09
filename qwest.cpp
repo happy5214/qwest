@@ -6,17 +6,19 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <vector>
 #include <signal.h>
 #include <unistd.h>
 
 #include "arg_parser.h"
 #include "int128.h"
+#include "qwest.h"
 
 #define REPORT_INTERVAL 5000000
 
 #define BUFFER_SIZE 50
 
-int *primes;
+std::vector<int> primes;
 int *plist;
 int *otable;
 int *o1list;    // list of primes with ord(p,b) = 1
@@ -50,59 +52,6 @@ void terminate(int signum)
   stop = true;
 }
 
-int Erathosthenes(int pmax)
-{
-  int numbers[pmax];
-  int i, j, count;
-  for (i=0; i<pmax-1; i++)
-    numbers[i] = i+2;
-// sieve
-  for (i=0; i<pmax-1; i++)
-    if (numbers[i] > 0)
-      for (j=2*numbers[i]-2; j<pmax; j+=numbers[i])
-        numbers[j] = 0;
-// count the primes
-  count = 0;
-  for (i=0; i<pmax-1; i++)
-    if (numbers[i] > 0)
-      count++;
-  primes = (int *) calloc(count, sizeof(int));
-// transfer the primes to their own array
-  j = 0;
-  for (i=0; i<pmax-1; i++)
-    if (numbers[i] > 0)
-      primes[j++] = numbers[i];
-  return j;
-}
-
-int powmod(int b, int n, int m)    /* powmod = b^n mod m */
-{
-  int res = 1;
-  int d;
-  while (n > 0)
-  {
-    d = n%2;
-    if (d == 1)
-      res = (b*res)%m;
-    b = (b*b)%m;
-    n = (n-d)/2;
-  }
-  return res;
-}
-
-int ord(int a, int b)
-{
-  int k = 1;
-  int res = b%a;
-  while (res != 1)
-  {
-    k += 1;
-    res *= b;
-    res = res%a;
-  }
-  return k;
-}
-
 void init_plist(bool skip_kstep_factors)
 {
   size_t i;
@@ -125,7 +74,9 @@ void init_plist(bool skip_kstep_factors)
         plist[count] = p;
         otable[count] = o;
         ocount += o;
-//        printf("p = %d otable[%d] = %d\n", p, count, otable[count]);
+#if 0
+        printf("p = %d otable[%d] = %d\n", p, count, otable[count]);
+#endif
         count++;
       }
       if (o == 1)
@@ -159,7 +110,9 @@ void init_nmap(void)
     p = plist[i];
     for (n=0; n<otable[i]; n++)
     {
-//      printf("k = %d p = %d otable(%d) = %d\n", k, p, i, otable[i]);
+#if 0
+      printf("k = %d p = %d otable(%d) = %d\n", k, p, i, otable[i]);
+#endif
       k = (b*k)%p;
       m = otable[i]-n-1;
       if (m == 0)
@@ -228,7 +181,9 @@ void close_files(void)
 
 void sieve(void)
 {
-//  uint64_t k;
+#if 0
+  uint64_t k;
+#endif
   uint128_t k;
 
   double to_percent;    // for percentage calculation
@@ -257,7 +212,9 @@ void sieve(void)
   for (n=0; n<maxn; n++)
     full_remain[n] = true;
 
-//  kmodb = ((kmin-kstep)%b+b)%b;
+#if 0
+  kmodb = ((kmin-kstep)%b+b)%b;
+#endif
   kmodb = (b + kmin%b - kstep%b)%b;
   kstepmodb = kstep%b;
   if (!riesel)
@@ -269,14 +226,18 @@ void sieve(void)
   for (i=0; i<nplist; i++)
   {
     p = plist[i];
-//    kmodp[i] = (p+(kmin-kstep)%p)%p;
-//    kmodp[i] = (p + kmin%p - kstep%p)%p;
+#if 0
+    kmodp[i] = (p+(kmin-kstep)%p)%p;
+    kmodp[i] = (p + kmin%p - kstep%p)%p;
+#endif
     if (riesel)
       kmodp[i] = (p + kmin%p - kstep%p)%p;
     else
       kmodp[i] = p - (p + kmin%p - kstep%p)%p;
-//    printf("p = %d, kmodp = %d\n", p, kmodp[i]);
-//    kstepmodp[i] = kstep%p;
+#if 0
+    printf("p = %d, kmodp = %d\n", p, kmodp[i]);
+    kstepmodp[i] = kstep%p;
+#endif
     if (riesel)
       kstepmodp[i] = kstep%p;
     else
@@ -285,9 +246,11 @@ void sieve(void)
   for (i=0; i<o1max; i++)
   {
     p = o1list[i];
-//    kbmodp[i] = (b*((kmin-kstep)%p+p))%p;
-//    kbmodp[i] = (b*(p + kmin%p - kstep%p))%p;
-//    bksmodp[i] = (b*kstep)%p;
+#if 0
+    kbmodp[i] = (b*((kmin-kstep)%p+p))%p;
+    kbmodp[i] = (b*(p + kmin%p - kstep%p))%p;
+    bksmodp[i] = (b*kstep)%p;
+#endif
     if (riesel)
     {
       kbmodp[i] = (b*(p + kmin%p - kstep%p))%p;
@@ -298,9 +261,11 @@ void sieve(void)
       kbmodp[i] = p - (b*(p + kmin%p - kstep%p))%p;
       bksmodp[i] = p - (b*kstep)%p;
     }
-//    printf("p = %d, kbmodp = %d, bksmodp = %d\n", p, kbmodp[i], bksmodp[i]);
+#if 0
+    printf("p = %d, kbmodp = %d, bksmodp = %d\n", p, kbmodp[i], bksmodp[i]);
+#endif
   }
-  
+
   to_percent = 100.0/(double)(kmax - kmin);
 // adjust kmax accordingly so that: kmax = kmin + x*kstep
   kmax -= (kmax-kmin)%kstep;
@@ -341,7 +306,9 @@ void sieve(void)
       for (i=0; i<o1max; i++)
       {
         if (kbmodp[i] == 1)     // Riesel
-//        if (kbmodp[i] == plist[i]-1)  // original Sierpinski (no inverting)
+#if 0
+        if (kbmodp[i] == plist[i]-1)  // original Sierpinski (no inverting)
+#endif
         {
           skip = true;
           break;
@@ -351,8 +318,10 @@ void sieve(void)
 
     if (!skip)
     {
-//      for (n=0; n<maxn; n++)
-//        remain[n] = true;
+#if 0
+      for (n=0; n<maxn; n++)
+        remain[n] = true;
+#endif
       memcpy(remain, full_remain, maxn*sizeof(bool));
       pos = 0;
       for (i=0; i<nplist; i++)
@@ -363,7 +332,9 @@ void sieve(void)
         if (ks > 0)
         {
           n = nmap[pos+ks];
-//          n = nmap[i*maxp+ks];
+#if 0
+          n = nmap[i*maxp+ks];
+#endif
           if (n > 0)
             for (l=n; l<=maxn; l+=o)
               remain[l-1] = false;
@@ -406,11 +377,11 @@ void sieve(void)
         }
       }
 
-/*
+#if 0
       for (n=0; n<maxn; n++)
         if (remain[n] == true)
           printf("%d\n", n+1);
-*/
+#endif
     }
     if (stop)
     {
@@ -433,7 +404,9 @@ void sieve(void)
 
 int main(const int argc, const char * const argv[])
 {
-//  char *ptr;
+#if 0
+  char *ptr;
+#endif
 
 /* default values */
   b      =       2;
@@ -483,13 +456,19 @@ int main(const int argc, const char * const argv[])
       case 'b' : b = stoi(arg);
                  break;
       case 'k' : kmin = strtou128(arg.c_str(), NULL, 10);
-// kmin = strtoull(arg, &ptr, 10);
+#if 0
+                 kmin = strtoull(arg, &ptr, 10);
+#endif
                  break;
       case 'K' : kmax = strtou128(arg.c_str(), NULL, 10);
-// kmax = strtoull(arg, &ptr, 10);
+#if 0
+                 kmax = strtoull(arg, &ptr, 10);
+#endif
                  break;
       case 's' : kstep = strtou128(arg.c_str(), NULL, 10);
-// kstep = strtoull(arg, &ptr, 10);
+#if 0
+                 kstep = strtoull(arg, &ptr, 10);
+#endif
                  break;
       case 'w' : low = stoi(arg);
                  break;
@@ -521,12 +500,17 @@ int main(const int argc, const char * const argv[])
   read_checkpoint();
   signal(SIGINT, terminate);
   signal(SIGTERM, terminate);
-//  printf("b = %d\n", b);
-//  snprint_u128(buffer, BUFFER_SIZE, kmin);
-//  printf ("k = %s", buffer);
-//  snprint_u128(buffer, BUFFER_SIZE, kmax);
-//  printf ("-%s", buffer);
-  nprimes = Erathosthenes(maxp);
+
+#if 0
+  printf("b = %d\n", b);
+  snprint_u128(buffer, BUFFER_SIZE, kmin);
+  printf ("k = %s", buffer);
+  snprint_u128(buffer, BUFFER_SIZE, kmax);
+  printf ("-%s", buffer);
+#endif
+
+  primes = Erathosthenes(maxp);
+  nprimes = primes.size();
   maxp = primes[nprimes-1];
   if (!quiet)
   {
@@ -534,17 +518,17 @@ int main(const int argc, const char * const argv[])
     printf("largest prime = %d\n", maxp);
   }
 
-/*
+#if 0
   int i;
   for (i=0; i<nprimes; i++)
     printf("%4d", primes[i]);
   printf("\n");
-*/
-   
+#endif
+
   init_plist(slicing);
   init_nmap();
 
-/*
+#if 0
   int i, j;
   for (i=0; i<nprimes; i++)
   {
@@ -552,7 +536,7 @@ int main(const int argc, const char * const argv[])
       printf("%3d", nmap[i*maxp+j]);
     printf("\n");
   }
-*/
+#endif
 
   open_files();
   sieve();
