@@ -47,8 +47,7 @@ static std::ofstream highfile;
 
 char buffer[BUFFER_SIZE];
 
-void terminate(int signum)
-{
+void terminate(int signum) {
   signal (signum, SIG_IGN);
   stop = true;
 }
@@ -87,10 +86,9 @@ void init_plist(bool skip_kstep_factors)
   nplist = count;
   opmax = ocount;
   o1max = o1count;
-  if (!quiet)
-  {
-    printf("opmax = %d\n", opmax);
-    printf("o1max = %d\n", o1max);
+  if (!quiet) {
+    std::cout << "opmax = " << opmax << "\n";
+    std::cout << "o1max = " << o1max << "\n";
   }
 }
 
@@ -196,8 +194,7 @@ void sieve(void)
   bool *full_remain;
   remain = (bool *) calloc(maxn, sizeof(bool));
   full_remain = (bool *) calloc(maxn, sizeof(bool));
-  if ((remain == NULL) || (full_remain == NULL))
-  {
+  if ((remain == NULL) || (full_remain == NULL)) {
     std::cerr << "memory allocation error!" << std::endl;
     exit(1);
   }
@@ -265,8 +262,7 @@ void sieve(void)
   if (kmax + kstep < kmax)    // to prevent overflow at 2^128-1
   {
     kmax -= kstep;
-    snprint_u128(buffer, BUFFER_SIZE, kmax);
-    printf ("kmax (adjusted) = %s\n", buffer);
+    std::cout << "kmax (adjusted) = " << kmax << std::endl;
   }
 
   countdown = REPORT_INTERVAL;
@@ -373,18 +369,15 @@ void sieve(void)
           printf("%d\n", n+1);
 #endif
     }
-    if (stop)
-    {
-      n = snprint_u128(buffer, BUFFER_SIZE, k);
+    if (stop) {
       std::cout << "Terminating at k = " << k << std::endl;
       write_checkpoint(k+kstep);
       break;
     }
     countdown--;
-    if ((countdown == 0) && !quiet)
-    {
-      n = snprint_u128(buffer, BUFFER_SIZE, k);
-      printf("Tested up to k = %s (%.2f%% done)\n", buffer, (k-kmin)*to_percent);
+    if ((countdown == 0) && !quiet) {
+      snprintf(buffer, BUFFER_SIZE, "%.2f", (k-kmin)*to_percent);
+      std::cout << "Tested up to k = " << k << " (" << buffer << "% done)" << std::endl;
       countdown = REPORT_INTERVAL;
     }
   }
