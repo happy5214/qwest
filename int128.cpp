@@ -1,8 +1,8 @@
-#include <ctype.h>
-#include <errno.h>
-#include <inttypes.h>
-#include <stdint.h>
-#include <stdio.h>
+#include <cctype>
+#include <cerrno>
+#include <cinttypes>
+#include <cstdint>
+#include <cstdio>
 
 #include "int128.h"
 

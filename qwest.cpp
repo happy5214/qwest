@@ -1,14 +1,15 @@
 /* rewrite of MULTI5.F */
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <unistd.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <string>
 #include <signal.h>
+#include <unistd.h>
 
-#include "carg_parser.h"
+#include "arg_parser.h"
 #include "int128.h"
 
 #define REPORT_INTERVAL 5000000
@@ -104,7 +105,7 @@ int ord(int a, int b)
 
 void init_plist(bool skip_kstep_factors)
 {
-  int i;
+  size_t i;
   int p;
   int o;
   int count = 0;
@@ -451,63 +452,59 @@ int main(const int argc, const char * const argv[])
   slice  =       0;
   modulus =      1;
 
-  const ap_Option options[] = {
+  const Arg_parser::Option options[] = {
     /* code, long_name, has_arg (no/yes/maybe/yme) */
-    { 'r', "riesel",    ap_no  },
-    { 'b', "base",      ap_yes },
-    { 'k', "k-min",     ap_yes },
-    { 'K', "k-max",     ap_yes },
-    { 's', "k-step",    ap_yes },
-    { 'n', "n-max",     ap_yes },
-    { 'p', "p-max",     ap_yes },
-    { 'o', "o-max",     ap_yes },
-    { 'w', "w-low",     ap_yes },
-    { 'W', "w-high",    ap_yes },
-    { 'q', "quiet",     ap_no  },
-    { 'z', "skip-zero", ap_no  },
-    { 0, 0,             ap_no  }
+    { 'r', "riesel",    Arg_parser::no  },
+    { 'b', "base",      Arg_parser::yes },
+    { 'k', "k-min",     Arg_parser::yes },
+    { 'K', "k-max",     Arg_parser::yes },
+    { 's', "k-step",    Arg_parser::yes },
+    { 'n', "n-max",     Arg_parser::yes },
+    { 'p', "p-max",     Arg_parser::yes },
+    { 'o', "o-max",     Arg_parser::yes },
+    { 'w', "w-low",     Arg_parser::yes },
+    { 'W', "w-high",    Arg_parser::yes },
+    { 'q', "quiet",     Arg_parser::no  },
+    { 'z', "skip-zero", Arg_parser::no  },
+    { 0, 0,             Arg_parser::no  }
   };
 
-  Arg_parser parser;
-  int argind = 0;
-
-  if (!ap_init(&parser, argc, argv, options, 0)) {
-    return 1;
-  }
-  if (ap_error(&parser)) {
+  const Arg_parser parser(argc, argv, options);
+  if (parser.error().size()) {
+    std::cerr << "Argument error: " << parser.error() << std::endl;
     return 1;
   }
 
-  for (; argind < ap_arguments(&parser); ++argind) {
-    const int code = ap_code(&parser, argind);
-    const char * const arg = ap_argument(&parser, argind);
+  for (int argind = 0; argind < parser.arguments(); ++argind ) {
+    const int code = parser.code(argind);
     if (!code) break;				/* no more options */
+    const std::string arg = parser.argument(argind);
     switch (code) {
-      case 'b' : b = atoi(arg);
+      case 'b' : b = stoi(arg);
                  break;
-      case 'k' : kmin = strtou128(arg, NULL, 10);
+      case 'k' : kmin = strtou128(arg.c_str(), NULL, 10);
 // kmin = strtoull(arg, &ptr, 10);
                  break;
-      case 'K' : kmax = strtou128(arg, NULL, 10);
+      case 'K' : kmax = strtou128(arg.c_str(), NULL, 10);
 // kmax = strtoull(arg, &ptr, 10);
                  break;
-      case 's' : kstep = strtou128(arg, NULL, 10);
+      case 's' : kstep = strtou128(arg.c_str(), NULL, 10);
 // kstep = strtoull(arg, &ptr, 10);
                  break;
-      case 'w' : low = atoi(arg);
+      case 'w' : low = stoi(arg);
                  break;
-      case 'W' : high = atoi(arg);
+      case 'W' : high = stoi(arg);
                  break;
-      case 'p' : maxp = atoi(arg);
+      case 'p' : maxp = stoi(arg);
                  break;
-      case 'o' : maxord = atoi(arg);
+      case 'o' : maxord = stoi(arg);
                  break;
-      case 'n' : maxn = atoi(arg);
+      case 'n' : maxn = stoi(arg);
                  break;
-      case 'e' : slice = atoi(arg)-1;
+      case 'e' : slice = stoi(arg)-1;
                  slicing = true;
                  break;
-      case 'm' : modulus = atoi(arg);
+      case 'm' : modulus = stoi(arg);
                  slicing = true;
                  break;
       case 'q' : quiet = true;
@@ -516,10 +513,10 @@ int main(const int argc, const char * const argv[])
                  break;
       case 'r' : riesel = true;
                  break;
-      default  : return 1;
+      default  : std::cerr << "Uncaught option: " << code << std::endl;
+                 return 1;
     }
   }
-  ap_free(&parser);
 
   read_checkpoint();
   signal(SIGINT, terminate);
