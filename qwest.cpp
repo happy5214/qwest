@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -18,7 +19,7 @@
 
 #define BUFFER_SIZE 50
 
-std::vector<int> primes;
+static std::vector<int> primes;
 int *plist;
 int *otable;
 int *o1list;    // list of primes with ord(p,b) = 1
@@ -27,7 +28,7 @@ int b = 2;
 int nplist = 0;
 int opmax = 0;
 int o1max = 0;
-size_t nprimes;
+static size_t nprimes;
 int maxp = 512;
 int maxord = 512;
 int maxn = 1000;
@@ -40,9 +41,9 @@ bool riesel = false;
 bool ignore_zeros = false;
 uint128_t kmin, kmax, kstep;
 int low, high;
-FILE *zerofile;
-FILE *lowfile;
-FILE *highfile;
+static std::ofstream zerofile;
+static std::ofstream lowfile;
+static std::ofstream highfile;
 
 char buffer[BUFFER_SIZE];
 
@@ -99,7 +100,7 @@ void init_nmap(void)
   nmap = (int *) calloc(nprimes*maxp, sizeof(int));
   if (nmap == NULL)
   {
-    printf("memory allocation error!\n");
+    std::cerr << "memory allocation error!" << std::endl;
     exit(1);
   }
 
@@ -123,60 +124,52 @@ void init_nmap(void)
   }
 }
 
-void open_files(void)
-{
-  if (!ignore_zeros)
-    zerofile = fopen("zero.txt", "a");
-  lowfile  = fopen("low.txt",  "a");
-  highfile = fopen("high.txt", "a");
-  if ((!ignore_zeros && !zerofile) || (!lowfile) || (!highfile))
-  {
-    printf("error creating/opening files!\n");
-    exit(1);
-  }
+void open_files(void) {
+	if (!ignore_zeros) {
+		zerofile.open("zero.txt", std::ios::out | std::ios::app);
+	}
+	lowfile.open("low.txt", std::ios::out | std::ios::app);
+	highfile.open("high.txt", std::ios::out | std::ios::app);
+	if ((!ignore_zeros && !zerofile) || (!lowfile) || (!highfile)) {
+		std::cerr << "error creating/opening files!" << std::endl;
+		exit(1);
+	}
 }
 
-void read_checkpoint()
-{
-  FILE *file;
-  uint128_t k;
-  if ((file = fopen("checkpoint.txt", "r")) == NULL)
-    return;
+void read_checkpoint() {
+	std::ifstream file("checkpoint.txt");
+	if (!file) {
+		return;
+	}
 
-  if (fscanf(file,"%s", buffer) == 1)
-  {
-    k = strtou128(buffer, NULL, 10);
-    if (kmin < k)
-    {
-      kmin = k;
-      snprint_u128(buffer, BUFFER_SIZE, k);
-      printf("Resuming from checkpoint k = %s\n", buffer);
-    }
-  }
-  fclose(file);
-  remove("checkpoint.txt");
+	std::string line;
+	file >> line;
+	uint128_t k = strtou128(line.c_str(), NULL, 10);
+	if (kmin < k) {
+		kmin = k;
+		std::cout << "Resuming from checkpoint k = " << k << std::endl;
+	}
+
+	file.close();
+	remove("checkpoint.txt");
 }
 
-void write_checkpoint(uint128_t k)
-{
-  FILE *file;
-  file = fopen("checkpoint.txt", "w");
-  if (!file)
-  {
-    printf("error creating checkpoint file!\n");
-    exit(1);
-  }
-  snprint_u128(buffer, BUFFER_SIZE, k);
-  fprintf(file, "%s\n", buffer);
-  fclose(file);
+void write_checkpoint(uint128_t k) {
+	std::ofstream file("checkpoint.txt");
+	if (!file) {
+		std::cerr << "error creating checkpoint file!" << std::endl;
+		exit(1);
+	}
+	file << k << std::endl;
+	file.close();
 }
 
-void close_files(void)
-{
-  if (!ignore_zeros)
-    fclose(zerofile);
-  fclose(lowfile);
-  fclose(highfile);
+void close_files(void) {
+	if (!ignore_zeros) {
+		zerofile.close();
+	}
+	lowfile.close();
+	highfile.close();
 }
 
 void sieve(void)
@@ -205,7 +198,7 @@ void sieve(void)
   full_remain = (bool *) calloc(maxn, sizeof(bool));
   if ((remain == NULL) || (full_remain == NULL))
   {
-    printf("memory allocation error!\n");
+    std::cerr << "memory allocation error!" << std::endl;
     exit(1);
   }
 
@@ -359,21 +352,18 @@ void sieve(void)
       { 
         if (!ignore_zeros)
         {
-          n = snprint_u128(buffer, BUFFER_SIZE, k);
-          fprintf (zerofile, "%40s %4d\n", buffer, count);
+			zerofile << k << " " << count << "\n";
         }
       }
       else
       {
         if (count <= low)
         {
-          n = snprint_u128(buffer, BUFFER_SIZE, k);
-          fprintf (lowfile,  "%40s %4d\n", buffer, count);
+			lowfile << k << " " << count << "\n";
         }
         if (count >= high)
         {
-          n = snprint_u128(buffer, BUFFER_SIZE, k);
-          fprintf (highfile, "%40s %4d\n", buffer, count);
+			highfile << k << " " << count << "\n";
         }
       }
 
@@ -386,7 +376,7 @@ void sieve(void)
     if (stop)
     {
       n = snprint_u128(buffer, BUFFER_SIZE, k);
-      printf("Terminating at k = %s\n", buffer);
+      std::cout << "Terminating at k = " << k << std::endl;
       write_checkpoint(k+kstep);
       break;
     }
